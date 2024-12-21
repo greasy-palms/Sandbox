@@ -1,0 +1,36 @@
+! Define prefix lists
+ip prefix-list TRANSIT_ROUTES seq 10 permit 0.0.0.0/0 le 32
+ip prefix-list IXP_ALLOWED_ROUTES seq 10 permit 203.0.113.0/24
+ip prefix-list IXP_ALLOWED_ROUTES seq 20 permit 198.51.100.0/24
+
+! Define AS path access list for transit provider (optional for inbound filtering)
+ip as-path access-list 1 permit ^9129$
+
+! Create route maps
+! Outbound filter to IXP
+route-map IXP_OUTBOUND deny 10
+ match ip address prefix-list TRANSIT_ROUTES
+
+route-map IXP_OUTBOUND permit 20
+ match ip address prefix-list IXP_ALLOWED_ROUTES
+
+! Inbound filter from transit provider (optional)
+route-map TRANSIT_IN permit 10
+ match as-path 1
+
+! Configure BGP
+router bgp <YOUR_AS>
+ bgp log-neighbor-changes
+
+ ! IXP peer configuration
+ neighbor <IXP_PEER_IP> remote-as <IXP_AS>
+ neighbor <IXP_PEER_IP> description IXP Peer
+ neighbor <IXP_PEER_IP> route-map IXP_OUTBOUND out
+
+ ! Transit provider configuration
+ neighbor <TRANSIT_PROVIDER_IP> remote-as 9129
+ neighbor <TRANSIT_PROVIDER_IP> description Transit Provider
+ neighbor <TRANSIT_PROVIDER_IP> route-map TRANSIT_IN in
+
+! Enable logging for debugging (optional)
+debug ip bgp updates
